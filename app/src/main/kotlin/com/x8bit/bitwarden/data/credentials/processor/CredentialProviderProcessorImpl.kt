@@ -1,5 +1,6 @@
 package com.x8bit.bitwarden.data.credentials.processor
 
+import android.app.PendingIntent
 import android.content.Context
 import android.os.Build
 import android.os.CancellationSignal
@@ -23,22 +24,30 @@ import androidx.credentials.provider.BeginCreatePasswordCredentialRequest
 import androidx.credentials.provider.BeginCreatePublicKeyCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialResponse
+import androidx.credentials.provider.BeginGetPublicKeyCredentialOption
 import androidx.credentials.provider.BiometricPromptData
 import androidx.credentials.provider.CreateEntry
 import androidx.credentials.provider.ProviderClearCredentialStateRequest
+import androidx.credentials.provider.PublicKeyCredentialEntry
 import com.bitwarden.core.data.manager.dispatcher.DispatcherManager
 import com.bitwarden.core.util.isBuildVersionAtLeast
+import com.bitwarden.core.util.isHyperOS
+import com.bitwarden.core.util.toPendingIntentMutabilityFlag
 import com.bitwarden.ui.platform.resource.BitwardenString
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
+import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
+import com.x8bit.bitwarden.data.autofill.util.createAutofillSelectionIntent
 import com.x8bit.bitwarden.data.credentials.manager.BitwardenCredentialManager
 import com.x8bit.bitwarden.data.credentials.manager.CredentialManagerPendingIntentManager
 import com.x8bit.bitwarden.data.credentials.model.GetCredentialsRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import timber.log.Timber
 import java.time.Clock
 import javax.crypto.Cipher
+import kotlin.random.Random
 
 /**
  * The default implementation of [CredentialProviderProcessor]. Its purpose is to handle
@@ -104,18 +113,52 @@ class CredentialProviderProcessorImpl(
         // Return an unlock action if the current account is locked.
         if (!userState.activeAccount.isVaultUnlocked) {
             Timber.d("Vault is locked. Requesting unlock.")
-            val authenticationAction = AuthenticationAction(
-                title = context.getString(BitwardenString.unlock),
-                pendingIntent = pendingIntentManager.createFido2UnlockPendingIntent(
-                    userId = userState.activeUserId,
-                ),
-            )
+            if (isHyperOS()) {
+                val requestOption = request.beginGetCredentialOptions
+                    .filterIsInstance<BeginGetPublicKeyCredentialOption>().first()
 
-            callback.onResult(
-                BeginGetCredentialResponse(
-                    authenticationActions = listOf(authenticationAction),
-                ),
-            )
+                val intent = createAutofillSelectionIntent(
+                    context = context,
+                    framework = AutofillSelectionData.Framework.AUTOFILL,
+                    type = AutofillSelectionData.Type.LOGIN,
+                    uri = JSONObject(requestOption.requestJson).optString("rpId")
+                )
+
+                val pendingIntent = PendingIntent
+                    .getActivity(
+                        context,
+                        Random.nextInt(),
+                        intent,
+                        PendingIntent.FLAG_CANCEL_CURRENT.toPendingIntentMutabilityFlag(),
+                    )
+
+                val dummyEntry = PublicKeyCredentialEntry.Builder(
+                    context = context,
+                    username = context.getString(BitwardenString.bitwarden),
+                    beginGetPublicKeyCredentialOption = requestOption,
+                    pendingIntent = pendingIntent
+                ).build()
+
+                callback.onResult(
+                    BeginGetCredentialResponse(
+                        credentialEntries = listOf(dummyEntry)
+                    )
+                )
+
+            } else {
+                val authenticationAction = AuthenticationAction(
+                    title = context.getString(BitwardenString.unlock),
+                    pendingIntent = pendingIntentManager.createFido2UnlockPendingIntent(
+                        userId = userState.activeUserId,
+                    ),
+                )
+
+                callback.onResult(
+                    BeginGetCredentialResponse(
+                        authenticationActions = listOf(authenticationAction),
+                    ),
+                )
+            }
             return
         }
 
