@@ -117,26 +117,13 @@ class CredentialProviderProcessorImpl(
                 val requestOption = request.beginGetCredentialOptions
                     .filterIsInstance<BeginGetPublicKeyCredentialOption>().first()
 
-                val intent = createAutofillSelectionIntent(
-                    context = context,
-                    framework = AutofillSelectionData.Framework.AUTOFILL,
-                    type = AutofillSelectionData.Type.LOGIN,
-                    uri = JSONObject(requestOption.requestJson).optString("rpId")
-                )
-
-                val pendingIntent = PendingIntent
-                    .getActivity(
-                        context,
-                        Random.nextInt(),
-                        intent,
-                        PendingIntent.FLAG_CANCEL_CURRENT.toPendingIntentMutabilityFlag(),
-                    )
-
                 val dummyEntry = PublicKeyCredentialEntry.Builder(
                     context = context,
                     username = context.getString(BitwardenString.bitwarden),
                     beginGetPublicKeyCredentialOption = requestOption,
-                    pendingIntent = pendingIntent
+                    pendingIntent = pendingIntentManager.createPublicKeySelectionPendingIntent(
+                        userId = userState.activeUserId,
+                    ),
                 ).build()
 
                 callback.onResult(

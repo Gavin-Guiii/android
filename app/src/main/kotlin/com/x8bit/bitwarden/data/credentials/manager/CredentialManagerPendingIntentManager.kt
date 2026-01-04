@@ -59,6 +59,13 @@ interface CredentialManagerPendingIntentManager {
     ): PendingIntent
 
     /**
+     * Creates a pending intent to send the user to a manual selection process for autofill.
+     */
+    fun createPublicKeySelectionPendingIntent(
+        userId: String,
+    ): PendingIntent
+
+    /**
      * Creates a pending intent to use when providing options for Password credential creation.
      */
     fun createPasswordCreationPendingIntent(
