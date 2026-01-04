@@ -76,10 +76,10 @@ class CredentialManagerPendingIntentManagerImpl(
     }
 
     /**
-     * Creates a pending intent to send the user to a manual selection process for autofill.
+     * Creates a pending intent to send the user to a manual selection process for passkey
      */
     override fun createPublicKeySelectionPendingIntent(
-        userId: String,
+        userId: String
     ): PendingIntent {
         val intent = Intent(SELECT_PASSKEY_ACTION)
             .setPackage(context.packageName)

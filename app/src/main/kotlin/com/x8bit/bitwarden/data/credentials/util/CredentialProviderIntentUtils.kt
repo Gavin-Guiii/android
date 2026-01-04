@@ -15,6 +15,7 @@ import com.x8bit.bitwarden.data.credentials.manager.EXTRA_KEY_UV_PERFORMED_DURIN
 import com.x8bit.bitwarden.data.credentials.model.CreateCredentialRequest
 import com.x8bit.bitwarden.data.credentials.model.Fido2CredentialAssertionRequest
 import com.x8bit.bitwarden.data.credentials.model.GetCredentialsRequest
+import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasskeyCredentialRequest
 import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasswordCredentialRequest
 
 /**
@@ -107,6 +108,34 @@ fun Intent.getProviderGetPasswordRequestOrNull(): ProviderGetPasswordCredentialR
     return ProviderGetPasswordCredentialRequest(
         userId = userId,
         cipherId = cipherId,
+        isUserPreVerified = isUserPreVerified,
+        requestData = ProviderGetCredentialRequest.asBundle(systemRequest),
+    )
+}
+
+/**
+ * Checks if this [Intent] contains a [ProviderGetPasskeyCredentialRequest] related to an
+ * ongoing password credential GetPasskey process.
+ */
+fun Intent.getProviderGetPasskeyRequestOrNull(): ProviderGetPasskeyCredentialRequest? {
+    if (!isBuildVersionAtLeast(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)) return null
+
+    val systemRequest = PendingIntentHandler
+        .retrieveProviderGetCredentialRequest(this)
+        ?: return null
+
+    val userId: String = getStringExtra(EXTRA_KEY_USER_ID)
+        ?: return null
+
+    // Extract the OS biometric prompt result from the request data because it is not included in
+    // the bundle returned by `ProviderGetCredentialRequest.asBundle()`.
+    val isUserPreVerified = systemRequest
+        .biometricPromptResult
+        ?.isSuccessful
+        ?: getBooleanExtra(EXTRA_KEY_UV_PERFORMED_DURING_UNLOCK, false)
+
+    return ProviderGetPasskeyCredentialRequest(
+        userId = userId,
         isUserPreVerified = isUserPreVerified,
         requestData = ProviderGetCredentialRequest.asBundle(systemRequest),
     )

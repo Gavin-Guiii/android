@@ -10,6 +10,7 @@ import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
 import com.x8bit.bitwarden.data.credentials.model.CreateCredentialRequest
 import com.x8bit.bitwarden.data.credentials.model.Fido2CredentialAssertionRequest
 import com.x8bit.bitwarden.data.credentials.model.GetCredentialsRequest
+import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasskeyCredentialRequest
 import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasswordCredentialRequest
 import kotlinx.parcelize.Parcelize
 
@@ -87,6 +88,15 @@ sealed class SpecialCircumstance : Parcelable {
     @Parcelize
     data class ProviderGetPasswordRequest(
         val passwordGetRequest: ProviderGetPasswordCredentialRequest,
+    ) : SpecialCircumstance()
+
+    /**
+     * The app was launched via the [CredentialManager] framework in order to retrieve a Passkey
+     * credential saved to the user's vault.
+     */
+    @Parcelize
+    data class ProviderGetPasskeyRequest(
+        val passkeyGetRequest: ProviderGetPasskeyCredentialRequest,
     ) : SpecialCircumstance()
 
     /**

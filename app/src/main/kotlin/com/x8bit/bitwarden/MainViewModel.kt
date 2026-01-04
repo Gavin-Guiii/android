@@ -30,6 +30,7 @@ import com.x8bit.bitwarden.data.credentials.manager.BitwardenCredentialManager
 import com.x8bit.bitwarden.data.credentials.util.getCreateCredentialRequestOrNull
 import com.x8bit.bitwarden.data.credentials.util.getFido2AssertionRequestOrNull
 import com.x8bit.bitwarden.data.credentials.util.getGetCredentialsRequestOrNull
+import com.x8bit.bitwarden.data.credentials.util.getProviderGetPasskeyRequestOrNull
 import com.x8bit.bitwarden.data.credentials.util.getProviderGetPasswordRequestOrNull
 import com.x8bit.bitwarden.data.platform.manager.AppResumeManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
@@ -318,6 +319,7 @@ class MainViewModel @Inject constructor(
         val getCredentialsRequest = intent.getGetCredentialsRequestOrNull()
         val fido2AssertCredentialRequest = intent.getFido2AssertionRequestOrNull()
         val providerGetPasswordRequest = intent.getProviderGetPasswordRequestOrNull()
+        val providerGetPasskeyRequest = intent.getProviderGetPasskeyRequestOrNull()
         val importCredentialsRequest = intent.getProviderImportCredentialsRequest()
         when {
             passwordlessRequestData != null -> {
@@ -419,6 +421,13 @@ class MainViewModel @Inject constructor(
                 specialCircumstanceManager.specialCircumstance =
                     SpecialCircumstance.ProviderGetPasswordRequest(
                         passwordGetRequest = providerGetPasswordRequest,
+                    )
+            }
+
+            providerGetPasskeyRequest != null -> {
+                specialCircumstanceManager.specialCircumstance =
+                    SpecialCircumstance.ProviderGetPasskeyRequest(
+                        passkeyGetRequest = providerGetPasskeyRequest,
                     )
             }
 
