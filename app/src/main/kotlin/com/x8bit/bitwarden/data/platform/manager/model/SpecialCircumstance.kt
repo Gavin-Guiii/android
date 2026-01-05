@@ -97,7 +97,8 @@ sealed class SpecialCircumstance : Parcelable {
     @Parcelize
     data class ProviderGetPasskeyRequest(
         val passkeyGetRequest: ProviderGetPasskeyCredentialRequest,
-    ) : SpecialCircumstance()
+        val shouldFinishWhenComplete: Boolean
+        ) : SpecialCircumstance()
 
     /**
      * The app was launched via the [CredentialManager] framework request to retrieve credentials

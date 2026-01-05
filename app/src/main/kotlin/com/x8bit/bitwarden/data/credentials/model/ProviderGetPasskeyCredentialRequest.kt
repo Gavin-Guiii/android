@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.os.Parcelable
 import androidx.credentials.CredentialOption
 import androidx.credentials.GetPasswordOption
+import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.provider.CallingAppInfo
 import androidx.credentials.provider.ProviderGetCredentialRequest
 import kotlinx.parcelize.IgnoredOnParcel
@@ -13,7 +14,6 @@ import kotlinx.parcelize.Parcelize
  * Models a Passkey credential authentication request parsed from the launching intent.
  *
  * @property userId ID of the user requesting credential authentication.
- * @property cipherId ID of the cipher to be authenticated against.
  * @property isUserPreVerified Whether the user has already been verified by the OS biometric
  * prompt.
  * @property requestData Provider request data in the form of a [Bundle].
@@ -44,8 +44,8 @@ data class ProviderGetPasskeyCredentialRequest(
      * in the request options list.
      */
     @IgnoredOnParcel
-    val option: GetPasswordOption? by lazy {
+    val option: GetPublicKeyCredentialOption? by lazy {
         providerRequest.credentialOptions
-            .firstNotNullOfOrNull { it as? GetPasswordOption }
+            .firstNotNullOfOrNull { it as? GetPublicKeyCredentialOption }
     }
 }

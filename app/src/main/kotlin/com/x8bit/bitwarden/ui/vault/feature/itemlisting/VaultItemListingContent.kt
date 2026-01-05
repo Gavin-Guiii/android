@@ -217,6 +217,10 @@ fun VaultItemListingContent(
                             masterPasswordRepromptData = MasterPasswordRepromptData.Autofill(
                                 cipherId = it.id,
                             )
+                        } else if (it.isPasskeySelection && it.shouldShowMasterPasswordReprompt) {
+                            masterPasswordRepromptData = MasterPasswordRepromptData.Autofill(
+                                cipherId = it.id,
+                            )
                         } else if (it.shouldShowMasterPasswordReprompt) {
                             masterPasswordRepromptData = MasterPasswordRepromptData.ViewItem(
                                 id = it.id,

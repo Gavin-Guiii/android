@@ -5,6 +5,7 @@ import com.bitwarden.annotation.OmitFromCoverage
 import com.x8bit.bitwarden.ui.credentials.manager.model.AssertFido2CredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.CreateCredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.GetCredentialsResult
+import com.x8bit.bitwarden.ui.credentials.manager.model.GetPasskeyCredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.GetPasswordCredentialResult
 
 /**
@@ -18,6 +19,8 @@ object CredentialProviderCompletionManagerUnsupportedApiImpl : CredentialProvide
     override fun completeFido2Assertion(result: AssertFido2CredentialResult) = Unit
 
     override fun completePasswordGet(result: GetPasswordCredentialResult) = Unit
+
+    override fun completePasskeyGet(result: GetPasskeyCredentialResult) = Unit
 
     override fun completeProviderGetCredentialsRequest(result: GetCredentialsResult) = Unit
 }

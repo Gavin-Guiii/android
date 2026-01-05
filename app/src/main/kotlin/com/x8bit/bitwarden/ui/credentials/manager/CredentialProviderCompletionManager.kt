@@ -3,6 +3,7 @@ package com.x8bit.bitwarden.ui.credentials.manager
 import com.x8bit.bitwarden.ui.credentials.manager.model.AssertFido2CredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.CreateCredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.GetCredentialsResult
+import com.x8bit.bitwarden.ui.credentials.manager.model.GetPasskeyCredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.GetPasswordCredentialResult
 
 /**
@@ -24,6 +25,11 @@ interface CredentialProviderCompletionManager {
      * Complete the Password credential retrieval process with the provided [result].
      */
     fun completePasswordGet(result: GetPasswordCredentialResult)
+
+    /**
+     * Complete the Passkey credential retrieval process with the provided [result].
+     */
+    fun completePasskeyGet(result: GetPasskeyCredentialResult)
 
     /**
      * Complete the CredentialManager "Get credentials" process with the provided [result].

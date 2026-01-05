@@ -17,6 +17,7 @@ import com.bitwarden.core.data.repository.util.map
 import com.bitwarden.data.repository.util.baseIconUrl
 import com.bitwarden.data.repository.util.baseWebSendUrl
 import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.sdk.Fido2CredentialStore
 import com.bitwarden.send.SendType
 import com.bitwarden.ui.platform.base.BackgroundEvent
 import com.bitwarden.ui.platform.base.BaseViewModel
@@ -50,6 +51,7 @@ import com.x8bit.bitwarden.data.credentials.model.Fido2CredentialAssertionReques
 import com.x8bit.bitwarden.data.credentials.model.Fido2CredentialAssertionResult
 import com.x8bit.bitwarden.data.credentials.model.Fido2RegisterCredentialResult
 import com.x8bit.bitwarden.data.credentials.model.GetCredentialsRequest
+import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasskeyCredentialRequest
 import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasswordCredentialRequest
 import com.x8bit.bitwarden.data.credentials.model.UserVerificationRequirement
 import com.x8bit.bitwarden.data.credentials.model.ValidateOriginResult
@@ -67,6 +69,7 @@ import com.x8bit.bitwarden.data.platform.manager.util.toAutofillSelectionDataOrN
 import com.x8bit.bitwarden.data.platform.manager.util.toCreateCredentialRequestOrNull
 import com.x8bit.bitwarden.data.platform.manager.util.toFido2AssertionRequestOrNull
 import com.x8bit.bitwarden.data.platform.manager.util.toGetCredentialsRequestOrNull
+import com.x8bit.bitwarden.data.platform.manager.util.toPasskeyGetRequestOrNull
 import com.x8bit.bitwarden.data.platform.manager.util.toPasswordGetRequestOrNull
 import com.x8bit.bitwarden.data.platform.manager.util.toTotpDataOrNull
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
@@ -81,6 +84,7 @@ import com.x8bit.bitwarden.data.vault.repository.model.VaultData
 import com.x8bit.bitwarden.ui.credentials.manager.model.AssertFido2CredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.CreateCredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.GetCredentialsResult
+import com.x8bit.bitwarden.ui.credentials.manager.model.GetPasskeyCredentialResult
 import com.x8bit.bitwarden.ui.credentials.manager.model.GetPasswordCredentialResult
 import com.x8bit.bitwarden.ui.platform.feature.search.SearchTypeData
 import com.x8bit.bitwarden.ui.platform.feature.search.model.SearchType
@@ -137,6 +141,7 @@ class VaultItemListingViewModel @Inject constructor(
     private val privilegedAppRepository: PrivilegedAppRepository,
     private val accessibilitySelectionManager: AccessibilitySelectionManager,
     private val autofillSelectionManager: AutofillSelectionManager,
+    private val fido2CredentialStore: Fido2CredentialStor
     private val cipherMatchingManager: CipherMatchingManager,
     private val specialCircumstanceManager: SpecialCircumstanceManager,
     private val policyManager: PolicyManager,
@@ -157,6 +162,7 @@ class VaultItemListingViewModel @Inject constructor(
         val providerGetCredentialsRequest = specialCircumstance?.toGetCredentialsRequestOrNull()
         val fido2AssertCredentialRequest = specialCircumstance?.toFido2AssertionRequestOrNull()
         val passwordGetCredentialRequest = specialCircumstance?.toPasswordGetRequestOrNull()
+        val passkeyGetCredentialRequest = specialCircumstance?.toPasskeyGetRequestOrNull()
         VaultItemListingState(
             itemListingType = savedStateHandle
                 .toVaultItemListingArgs()
@@ -185,6 +191,7 @@ class VaultItemListingViewModel @Inject constructor(
             createCredentialRequest = providerCreateCredentialRequest,
             fido2CredentialAssertionRequest = fido2AssertCredentialRequest,
             providerGetPasswordCredentialRequest = passwordGetCredentialRequest,
+            providerGetPasskeyCredentialRequest = passkeyGetCredentialRequest,
             getCredentialsRequest = providerGetCredentialsRequest,
             isPremium = userState.activeAccount.isPremium,
             isRefreshing = false,
@@ -250,6 +257,7 @@ class VaultItemListingViewModel @Inject constructor(
                 VaultItemListingsAction.Internal.VaultDataReceive(
                     it
                         .filterForAutofillIfNecessary()
+                        .filterForPasskeySelectionIfNecessary()
                         .filterForCredentialCreationIfNecessary()
                         .filterForTotpIfNecessary(),
                 )
@@ -448,6 +456,14 @@ class VaultItemListingViewModel @Inject constructor(
                     sendEvent(
                         VaultItemListingEvent.CompleteProviderGetPasswordCredentialRequest(
                             result = GetPasswordCredentialResult.Cancelled,
+                        ),
+                    )
+                }
+            ?: state.providerGetPasskeyCredentialRequest
+                ?.let {
+                    sendEvent(
+                        VaultItemListingEvent.CompleteProviderGetPasskeyCredentialRequest(
+                            result = GetPasskeyCredentialResult.Cancelled,
                         ),
                     )
                 }
@@ -914,6 +930,15 @@ class VaultItemListingViewModel @Inject constructor(
             )
             return
         }
+
+        state.providerGetPasskeyCredentialRequest?.let { passkeySelectionData ->
+            completePasskeySelection(
+                itemId = action.id,
+                passkeySelectionData = passkeySelectionData,
+            )
+            return
+        }
+
         state.totpData?.let {
             sendEvent(
                 event = VaultItemListingEvent.NavigateToEditCipher(
@@ -1377,6 +1402,16 @@ class VaultItemListingViewModel @Inject constructor(
                 )
             }
 
+            state.providerGetPasskeyCredentialRequest != null -> {
+                sendEvent(
+                    VaultItemListingEvent.CompleteProviderGetPasskeyCredentialRequest(
+                        result = GetPasskeyCredentialResult.Error(
+                            message = action.message,
+                        ),
+                    ),
+                )
+            }
+
             state.getCredentialsRequest != null -> {
                 sendEvent(
                     VaultItemListingEvent.CompleteProviderGetCredentialsRequest(
@@ -1402,7 +1437,7 @@ class VaultItemListingViewModel @Inject constructor(
 
     private fun handleBackClick() {
         sendEvent(
-            event = if (state.isTotp || state.isAutofill) {
+            event = if (state.isTotp || state.isAutofill || state.isPasskeySelection) {
                 VaultItemListingEvent.ExitApp
             } else {
                 VaultItemListingEvent.NavigateBack
@@ -1437,7 +1472,7 @@ class VaultItemListingViewModel @Inject constructor(
     }
 
     private fun handleSearchIconClick() {
-        val searchType = if (state.autofillSelectionData != null) {
+        val searchType = if (state.autofillSelectionData != null || state.providerGetPasskeyCredentialRequest != null) {
             SearchType.Vault.All
         } else {
             state.itemListingType.toSearchType()
@@ -1572,6 +1607,10 @@ class VaultItemListingViewModel @Inject constructor(
 
             is VaultItemListingsAction.Internal.ProviderGetPasswordCredentialRequestReceive -> {
                 handleProviderGetPasswordCredentialRequestReceive(action)
+            }
+
+            is VaultItemListingsAction.Internal.ProviderGetPasskeyCredentialRequestReceive -> {
+                handleProviderGetPasskeyCredentialRequestReceive(action)
             }
 
             VaultItemListingsAction.Internal.InternetConnectionErrorReceived -> {
@@ -1806,6 +1845,14 @@ class VaultItemListingViewModel @Inject constructor(
                 )
             }
 
+            is MasterPasswordRepromptData.Passkey -> {
+                // Complete the autofill selection flow
+                completePasskeySelection(
+                    itemId = data.cipherId,
+                    passkeySelectionData = state.providerGetPasskeyCredentialRequest ?: return,
+                )
+            }
+
             is MasterPasswordRepromptData.OverflowItem -> {
                 handleOverflowOptionClick(
                     VaultItemListingsAction.OverflowOptionClick(data.action),
@@ -1918,6 +1965,16 @@ class VaultItemListingViewModel @Inject constructor(
                     autofillSelectionManager.emitAutofillSelection(cipherView = cipherView)
                 }
             }
+        }
+    }
+
+    private fun completePasskeySelection(
+        itemId: String,
+        passkeySelectionData: ProviderGetPasskeyCredentialRequest,
+    ) {
+        viewModelScope.launch {
+            val cipherView = getCipherViewOrNull(cipherId = itemId) ?: return@launch
+            autofillSelectionManager.emitAutofillSelection(cipherView = cipherView)
         }
     }
 
@@ -2310,6 +2367,13 @@ class VaultItemListingViewModel @Inject constructor(
         }
     }
 
+    private fun handleProviderGetPasskeyCredentialRequestReceive(
+        action: VaultItemListingsAction.Internal.ProviderGetPasskeyCredentialRequestReceive,
+    ) {
+        bitwardenCredentialManager.isUserVerified = false
+        clearDialogState()
+    }
+
     private suspend fun sendCredentialDecryptionError(throwable: Throwable?) {
         sendAction(
             VaultItemListingsAction.Internal.CredentialOperationFailureReceive(
@@ -2477,6 +2541,7 @@ class VaultItemListingViewModel @Inject constructor(
                             baseIconUrl = state.baseIconUrl,
                             isIconLoadingDisabled = state.isIconLoadingDisabled,
                             autofillSelectionData = state.autofillSelectionData,
+                            passkeySelectionData = state.providerGetPasskeyCredentialRequest,
                             createCredentialRequestData = state.createCredentialRequest,
                             totpData = state.totpData,
                             isPremiumUser = state.isPremium,
@@ -2589,6 +2654,28 @@ class VaultItemListingViewModel @Inject constructor(
     }
 
     /**
+     * Takes the given vault data and filters it for passkey selection if necessary.
+     */
+    @Suppress("MaxLineLength")
+    private suspend fun DataState<VaultData>.filterForPasskeySelectionIfNecessary(): DataState<VaultData> {
+        val request = state.providerGetPasskeyCredentialRequest ?: return this
+        return this.map { vaultData ->
+            val matchUri = request.providerRequest.callingRequest.origin
+                ?: request.callingAppInfo.packageName.toAndroidAppUriString()
+
+            vaultData.copy(
+                decryptCipherListResult = vaultData.decryptCipherListResult.copy(
+                    successes = cipherMatchingManager.filterCiphersForMatches(
+                        cipherListViews = vaultData.decryptCipherListResult.successes,
+                        matchUri = matchUri,
+                    ),
+                    failures = emptyList(),
+                ),
+            )
+        }
+    }
+
+    /**
      * Takes the given vault data and filters it for credential creation if necessary.
      */
     @Suppress("MaxLineLength")
@@ -2683,6 +2770,7 @@ data class VaultItemListingState(
     val autofillSelectionData: AutofillSelectionData? = null,
     val createCredentialRequest: CreateCredentialRequest? = null,
     val fido2CredentialAssertionRequest: Fido2CredentialAssertionRequest? = null,
+    val providerGetPasskeyCredentialRequest: ProviderGetPasskeyCredentialRequest? = null,
     val providerGetPasswordCredentialRequest: ProviderGetPasswordCredentialRequest? = null,
     val getCredentialsRequest: GetCredentialsRequest? = null,
     val hasMasterPassword: Boolean,
@@ -2707,6 +2795,12 @@ data class VaultItemListingState(
      */
     val isAutofill: Boolean
         get() = autofillSelectionData != null
+
+    /**
+     * Whether or not this represents a listing screen for passkey selection.
+     */
+    val isPasskeySelection: Boolean
+        get() = providerGetPasskeyCredentialRequest != null
 
     /**
      * Whether or not this represents a listing screen for CredentialManager creation requests.
@@ -2759,19 +2853,19 @@ data class VaultItemListingState(
      * Whether or not the account switcher should be shown.
      */
     val shouldShowAccountSwitcher: Boolean
-        get() = isAutofill || isCredentialManagerCreation || isTotp
+        get() = isAutofill || isCredentialManagerCreation || isTotp || isPasskeySelection
 
     /**
      * Whether or not the navigation icon should be shown.
      */
     val shouldShowNavigationIcon: Boolean
-        get() = !isAutofill && !isCredentialManagerCreation && !isTotp
+        get() = !isAutofill && !isCredentialManagerCreation && !isTotp && !isPasskeySelection
 
     /**
      * Whether or not the overflow menu should be shown.
      */
     val shouldShowOverflowMenu: Boolean
-        get() = !isAutofill && !isCredentialManagerCreation && !isTotp
+        get() = !isAutofill && !isCredentialManagerCreation && !isTotp && !isPasskeySelection
 
     /**
      * Represents the current state of any dialogs on the screen.
@@ -2972,6 +3066,7 @@ data class VaultItemListingState(
      * @property overflowOptions list of options for the item's overflow menu.
      * @property optionsTestTag The test tag associated with the [overflowOptions].
      * @property isAutofill whether or not this screen is part of an autofill flow.
+     * @property isPasskeySelection whether or not this screen is part of a passkey selection flow.
      * @property isCredentialCreation whether or not this screen is part of CredentialManager
      * creation flow.
      * @property shouldShowMasterPasswordReprompt whether or not a master password reprompt is
@@ -2992,6 +3087,7 @@ data class VaultItemListingState(
         val overflowOptions: List<ListingItemOverflowAction>,
         val optionsTestTag: String,
         val isAutofill: Boolean,
+        val isPasskeySelection: Boolean,
         val isCredentialCreation: Boolean,
         val shouldShowMasterPasswordReprompt: Boolean,
         val itemType: ItemType,
@@ -3327,6 +3423,16 @@ sealed class VaultItemListingEvent {
      */
     data class CompleteProviderGetPasswordCredentialRequest(
         val result: GetPasswordCredentialResult,
+    ) : BackgroundEvent, VaultItemListingEvent()
+
+    /**
+     * Passkey credential assertion result has been received and the process is ready to be
+     * completed.
+     *
+     * @property result The result of the Passkey credential assertion.
+     */
+    data class CompleteProviderGetPasskeyCredentialRequest(
+        val result: GetPasskeyCredentialResult,
     ) : BackgroundEvent, VaultItemListingEvent()
 
     /**
@@ -3681,6 +3787,13 @@ sealed class VaultItemListingsAction {
         ) : Internal()
 
         /**
+         * Indicates that Passkey get request data has been received.
+         */
+        data class ProviderGetPasskeyCredentialRequestReceive(
+            val data: ProviderGetPasskeyCredentialRequest,
+        ) : Internal()
+
+        /**
          * Indicates that the there is not internet connection.
          */
         data object InternetConnectionErrorReceived : Internal()
@@ -3726,6 +3839,13 @@ sealed class MasterPasswordRepromptData {
      * Autofill was selected.
      */
     data class Autofill(
+        val cipherId: String,
+    ) : MasterPasswordRepromptData()
+
+    /**
+     * Passkey was selected.
+     */
+    data class Passkey(
         val cipherId: String,
     ) : MasterPasswordRepromptData()
 

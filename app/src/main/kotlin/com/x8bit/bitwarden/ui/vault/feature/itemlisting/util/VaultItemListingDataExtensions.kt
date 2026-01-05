@@ -22,6 +22,8 @@ import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
 import com.x8bit.bitwarden.data.autofill.util.isActiveWithFido2Credentials
 import com.x8bit.bitwarden.data.autofill.util.login
 import com.x8bit.bitwarden.data.credentials.model.CreateCredentialRequest
+import com.x8bit.bitwarden.data.credentials.model.ProviderGetPasskeyCredentialRequest
+import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
 import com.x8bit.bitwarden.data.vault.repository.util.toFailureCipherListView
 import com.x8bit.bitwarden.ui.tools.feature.send.util.toLabelIcons
@@ -110,6 +112,7 @@ fun VaultData.toViewState(
     baseIconUrl: String,
     isIconLoadingDisabled: Boolean,
     autofillSelectionData: AutofillSelectionData?,
+    passkeySelectionData: ProviderGetPasskeyCredentialRequest?,
     createCredentialRequestData: CreateCredentialRequest?,
     totpData: TotpData?,
     isPremiumUser: Boolean,
@@ -160,6 +163,7 @@ fun VaultData.toViewState(
                         hasMasterPassword = hasMasterPassword,
                         isIconLoadingDisabled = isIconLoadingDisabled,
                         isAutofill = autofillSelectionData != null,
+                        isPasskeySelection = passkeySelectionData != null,
                         isFido2Creation = createCredentialRequestData != null,
                         isPremiumUser = isPremiumUser,
                     ),
@@ -362,6 +366,7 @@ private fun List<CipherListView>.toDisplayItemList(
     hasMasterPassword: Boolean,
     isIconLoadingDisabled: Boolean,
     isAutofill: Boolean,
+    isPasskeySelection: Boolean,
     isFido2Creation: Boolean,
     isPremiumUser: Boolean,
 ): List<VaultItemListingState.DisplayItem> =
@@ -371,6 +376,7 @@ private fun List<CipherListView>.toDisplayItemList(
             hasMasterPassword = hasMasterPassword,
             isIconLoadingDisabled = isIconLoadingDisabled,
             isAutofill = isAutofill,
+            isPasskeySelection = isPasskeySelection,
             isFido2Creation = isFido2Creation,
             isPremiumUser = isPremiumUser,
         )
@@ -393,6 +399,7 @@ private fun CipherListView.toDisplayItem(
     hasMasterPassword: Boolean,
     isIconLoadingDisabled: Boolean,
     isAutofill: Boolean,
+    isPasskeySelection: Boolean,
     isFido2Creation: Boolean,
     isPremiumUser: Boolean,
 ): VaultItemListingState.DisplayItem =
@@ -408,11 +415,12 @@ private fun CipherListView.toDisplayItem(
         subtitleTestTag = this.toSubtitleTestTag(
             isAutofill = isAutofill,
             isFido2Creation = isFido2Creation,
+            isPasskeySelection = isPasskeySelection,
         ),
         iconData = this.toIconData(
             baseIconUrl = baseIconUrl,
             isIconLoadingDisabled = isIconLoadingDisabled,
-            usePasskeyDefaultIcon = (isAutofill || isFido2Creation) &&
+            usePasskeyDefaultIcon = (isAutofill || isFido2Creation || isPasskeySelection) &&
                 this.isActiveWithFido2Credentials,
         ),
         iconTestTag = this.toIconTestTag(),
@@ -423,6 +431,7 @@ private fun CipherListView.toDisplayItem(
         ),
         optionsTestTag = "CipherOptionsButton",
         isAutofill = isAutofill,
+        isPasskeySelection = isPasskeySelection,
         isCredentialCreation = isFido2Creation,
         shouldShowMasterPasswordReprompt = (reprompt == CipherRepromptType.PASSWORD) &&
             hasMasterPassword,
@@ -455,6 +464,7 @@ private fun CipherListView.toDisplayItemDecryptionError(): VaultItemListingState
         overflowOptions = emptyList(),
         optionsTestTag = "CipherOptionsButton",
         isAutofill = false,
+        isPasskeySelection = false,
         isCredentialCreation = false,
         shouldShowMasterPasswordReprompt = false,
         itemType = VaultItemListingState.DisplayItem.ItemType.DecryptionError,
@@ -467,8 +477,9 @@ private fun CipherListView.toSecondSubtitle(fido2CredentialRpId: String?): Strin
 private fun CipherListView.toSubtitleTestTag(
     isAutofill: Boolean,
     isFido2Creation: Boolean,
+    isPasskeySelection: Boolean,
 ): String =
-    if ((isAutofill || isFido2Creation)) {
+    if ((isAutofill || isFido2Creation || isPasskeySelection)) {
         if (this.isActiveWithFido2Credentials) "PasskeyName" else "PasswordName"
     } else {
         "CipherSubTitleLabel"
@@ -530,6 +541,7 @@ private fun SendView.toDisplayItem(
         overflowOptions = toOverflowActions(baseWebSendUrl = baseWebSendUrl),
         optionsTestTag = "SendOptionsButton",
         isAutofill = false,
+        isPasskeySelection = false,
         shouldShowMasterPasswordReprompt = false,
         isCredentialCreation = false,
         itemType = VaultItemListingState.DisplayItem.ItemType.Sends(type = this.type),

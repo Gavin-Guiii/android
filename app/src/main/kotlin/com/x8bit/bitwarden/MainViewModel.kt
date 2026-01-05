@@ -428,6 +428,9 @@ class MainViewModel @Inject constructor(
                 specialCircumstanceManager.specialCircumstance =
                     SpecialCircumstance.ProviderGetPasskeyRequest(
                         passkeyGetRequest = providerGetPasskeyRequest,
+                        // Allow users back into the already-running app when completing the
+                        // Send task when this is not the first intent.
+                        shouldFinishWhenComplete = isFirstIntent,
                     )
             }
 
